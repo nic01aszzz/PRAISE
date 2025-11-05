@@ -1,0 +1,19 @@
+Execution Modes
+    1. Distributed Mode (Pyro4)
+        This mode runs the environment on a separate process (sever), providing true agent independence 
+        and simulating network communication.
+
+        To run, start the three components in order:
+        1.  Start the Pyro Name Server (NS):
+            python -m Pyro4.naming
+        2.  Start the PRAISE Server (Daemon): Registers the environment and state buffers.
+            python main_server.py
+        3.  Run the PRAISE Client (Agent):Connects to the server and starts the concurrent threads.
+            python main_client.py
+
+
+    2. Local Mode (In-Process)
+        This mode runs the entire simulation within a single Python process, bypassing all network 
+        overhead while maintaining the core concurrency logic. This is ideal for quick testing and 
+        performance benchmarking.
+            python main.py
