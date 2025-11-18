@@ -29,11 +29,69 @@ GridWorldPyroAdapter
 from statebuffer import IStateBuffer
 from environments import SimulatedEnvironment
 
+class chessPiece:
+    def __init__(self, color):
+        self.color = color
+        self.simbolo = None 
+
+class Pawn(chessPiece):
+    def __init__(self, color):
+        super().__init__(color)
+
+    def legal_moves(self):  #
+        pass
+
+class Queen(chessPiece):
+    def __init__(self, color):
+        super().__init__(color)
+
+    def legal_moves(self):  #
+        pass
+
+class Rook(chessPiece):
+    def __init__(self, color):
+        super().__init__(color)
+
+    def legal_moves(self):  #
+        pass
+
+class Knight(chessPiece):
+    def __init__(self, color):
+        super().__init__(color)
+
+    def legal_moves(self):  #
+        pass
+
+
+class Bishop(chessPiece):
+    def __init__(self, color):
+        super().__init__(color)
+
+    def legal_moves(self):  #
+        pass
+
+class King(chessPiece):
+    def __init__(self, color):
+        super().__init__(color)
+
+    def legal_moves(self):
+        pass
+    def checkmate(self):
+        if ...:
+           return True # gg
+
 class chessEnv(SimulatedEnvironment):
-    #Primero se inicializa  el tablero, que va a ser un diccionario.
+    #Este diccionario es simplemente para ayudar despues con los movimientos, lo pongo como una variable
+    #acá porque lo van a usar todos los tableros que se hagan
+    mapeoCoordenadas = {
+        col + fila: [i, j] for i, fila in enumerate('12345678') for j, col in enumerate('abcdefgh') 
+    }
+
     def __new__(cls):
         return super().__new__(cls)
-
+    
+    
+    #Este diccionaro es el tablero que va a tener las piezas
     def crearTablero():
         columnas = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
         filas = ['1', '2', '3', '4', '5', '6', '7', '8']
@@ -44,16 +102,85 @@ class chessEnv(SimulatedEnvironment):
                 tablero[posicion] = None 
         return tablero
     
-    
+
+    #Esta función va a poner las piezas (que van a ser clases) en el tablero principal
+    def rellenarTablero(tablero):
+        tablero['a8'] = Rook('black')
+        tablero['h8'] = Rook('black')
+        tablero['b8'] = Knight('black')
+        tablero['g8'] = Knight('black')
+        tablero['c8'] = Bishop('black')
+        tablero['f8'] = Bishop('black')
+        tablero['d8'] = Queen('black')
+        tablero['e8'] = King('black')
+        tablero['a7'] = Pawn('black')
+        tablero['h7'] = Pawn('black')
+        tablero['b7'] = Pawn('black')
+        tablero['g7'] = Pawn('black')
+        tablero['c7'] = Pawn('black')
+        tablero['f7'] = Pawn('black')
+        tablero['d7'] = Pawn('black')
+        tablero['e7'] = Pawn('black')
+        
+        tablero['a2'] = Pawn('white')
+        tablero['h2'] = Pawn('white')
+        tablero['b2'] = Pawn('white')
+        tablero['g2'] = Pawn('white')
+        tablero['c2'] = Pawn('white')
+        tablero['f2'] = Pawn('white')
+        tablero['d2'] = Pawn('white')
+        tablero['e2'] = Pawn('white')
+        tablero['a1'] = Rook('white')
+        tablero['h1'] = Rook('white')
+        tablero['b1'] = Knight('white')
+        tablero['g1'] = Knight('white')
+        tablero['c1'] = Bishop('white')
+        tablero['f1'] = Bishop('white')
+        tablero['d1'] = Queen('white')
+        tablero['e1'] = King('white')
+        
+    def crearYRellenarTablero(self):
+        tablero = self.crearTablero()
+        self.rellenarTablero(tablero)
+        return tablero
+
+
     def __init__(self):
         super(chessEnv, self).__init__()
+        self._tablero = self.crearYRellenarTablero()
         self._tablero = self.crearTablero()
+        self._tableroCoordenadas = chessEnv.mapeoCoordenadas
+        self.rellenarTablero()
 
 
 
 
 
 """
+Posibles lógicas de movimiento
+1. 
+Cada pieza tiene una lista de los posibles movimientos dependiendo de su posición.
+Se hace dicho movimiento.
+
+2. 
+Cada pieza tiene una lógica de movimiento (esta es la más complicada creo)
+Se calculan los posibles movimientos en base a la posición y a la lógica de movimiento que tiene.
+
+3. 
+Se le pasa a la pieza su posición de inicio y su posición de fin deseada.
+La pieza verifica cosas en base a la posición de fin deseada. 
+
+
+
+
+
+pieces = [rook, knight, bishop, king, queen, bishop, knight, rook]
+
+    def _move_piece_to_square(self, piece, square):
+        if square isFree:
+            #Mover pieza
+        else:
+            #Mover pieza y eliminar la otra
 
     def __init__(self, length: int, random_dirt=False):
         super(VacuumEnvironment, self).__init__()
