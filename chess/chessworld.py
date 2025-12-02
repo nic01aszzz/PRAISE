@@ -10,19 +10,6 @@ Se tiene un tablero (matriz 8x8) con una posición inicial predeterminada, con l
 (nomenclatura estándar).
 Hay piezas, cada una con su comportamiento específico. 
 La idea es que el jugador juega contra el agente. 
-
-2. Creating New Environments
-To simulate a new world (e.g., a GridWorld or Traffic Simulation), you must implement new classes on the server side:
-
-Environment Class: Inherit from 
-SimulatedEnvironment
-. This class manages the simulation's core state.
-State Buffer Class: You can create a new concrete 
-IStateBuffer
- implementation if you need specific treatment of the relevant state dictionary from the Environment for the client's renderer.
-Pyro Adapter: Create and register a new Pyro Adapter (e.g., 
-GridWorldPyroAdapter
-) on the server to expose your new environment and its state buffer factory to clients via Pyro4.
 """
 from statebuffer import IStateBuffer
 from environments import SimulatedEnvironment
@@ -57,13 +44,48 @@ class Pawn(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
-    def legal_moves(self, posInicio, posFin):  
+    def legal_moves(self, posInicio, tablero):
         moves = []
-        pass
-#Si es el turno 1 o 2, fijarse de on passeant
-#Si es cualquier otro turno, fijarse si es para adelante o para los costados.
-#Si es para adelante (misma letra, distinto número), fijarse que no haya otra pieza adelante.
-#Si es para los costados (letras adyacentes con número + 1), fijarse que haya una pieza enemiga.
+        
+        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        fila = posActual[0]
+        col = posActual[1]
+
+        #los peones blancos y negros tienen direcciones y filas de inicio distintas
+        if self.color == 'white':
+            direccion = 1    # hacia indices mayores
+            fila_inicio = 1  # fila 2
+        else:
+            direccion = -1   # hacia indices menores
+            fila_inicio = 6  # fila 7
+
+        fila_frente = fila + direccion
+        
+        #no uso check_legal pq para adelante no puede comer, entonces no tiene sentido q devuelva true
+        if 0 <= fila_frente <= 7:
+            #movimiento para adelante
+            #1 casilla
+            if tablero.get(self.letras[col] + self.numeros[fila_frente]) is None:
+                moves.append(self.letras[col] + self.numeros[fila_frente])
+
+                #2 casillas
+                #esta adentro de este otro if para que no se salten piezas sin querer
+                if fila == fila_inicio:
+                        nueva_pos = self.letras[col] + self.numeros[fila + (direccion * 2)]
+                        if tablero.get(nueva_pos) is None:
+                            moves.append(nueva_pos)
+
+            cols_captura = [col - 1, col + 1] # izq y derecha
+
+            for columna in cols_captura:
+                #verifico que no me salga de los limites horizontales
+                if 0 <= columna <= 7:
+                    # ahora si uso check_legal porque es para comer otra pieza
+                    if self.check_legal([columna, fila_frente], tablero):    
+                        if tablero.get(self.letras[columna] + self.numeros[fila_frente]) is not None:
+                            moves.append(self.letras[columna] + self.numeros[fila_frente])
+        return moves
+    #falta implementar on peassant
 
 
 class Queen(chessPiece):
@@ -93,7 +115,6 @@ class Queen(chessPiece):
                 else:
                     break
         return moves
-#Lógica de la torre + el alfil
 
 
 class Rook(chessPiece):
@@ -224,7 +245,6 @@ class King(chessPiece):
             (-1, 1), #abajo a la derecha (disminuye fila y aumenta columna)
             (1, -1), # arriba a la izquierda (aumenta fila y disminuye columna)
             (-1, -1) #abajo a la izquierda (disminuye fila y columna)
-
         ]
 
         for dir_fila, dir_col in direcciones:
@@ -237,6 +257,7 @@ class King(chessPiece):
                 else:
                     break
         return moves
+    
 #La posición final está en:
 #La misma letra: el número es +-1
 #Letras adyacentes: número +-1 o el mismo 
@@ -320,18 +341,69 @@ class chessEnv(SimulatedEnvironment):
         self._tablero = self.crearYRellenarTablero()
         self._tableroCoordenadas = chessEnv.mapeoCoordenadas
 
+    def check_check(self, color_rey, tablero):
+        king_pos = None
+        for pos, pieza in tablero.items():
+            if pieza is not None:
+                if type(pieza).__name__ == "King" and pieza.color == color_rey:
+                    king_pos = pos
+                    break
 
+        if color_rey == "white":
+            enemy_color = "black" 
+        else:
+            enemy_color = "white"
 
+        for pos, pieza in tablero.items():
+            if pieza is not None and pieza.color == enemy_color:
+                if king_pos in pieza.legal_moves(pos, tablero):
+                    return True 
+ 
+        return False
 
+    #esta funcion sirve para ver si un movimiento no va a poner al rey en jaque. Implementa 123 de la timeline
+    def safe_movement(self, pos_origen, pos_destino, color):
+        copia_tablero = self._tablero.copy()
+        pieza = copia_tablero[pos_origen]
+        
+        copia_tablero[pos_destino] = pieza
+        copia_tablero[pos_origen] = None
+
+        if self.check_check(color, copia_tablero):
+            return False 
+        else:
+            return True
+
+    def check_mate(self, color, tablero):
+        #si no hay jaque, no hay mate
+        if not self.check_check(color, tablero):
+            return False
+
+        #buscamos en todas las piezas del mismo color si hay alguna que evite el check, de lo contrario, es checkmate
+        for pos_origen, pieza in tablero.items():
+            if pieza is not None and pieza.color == color:
+                movimientos = pieza.legal_moves(pos_origen, tablero)
+
+                for pos_destino in movimientos:
+                    tablero_simulado = tablero.copy()
+                    tablero_simulado[pos_destino] = pieza
+                    tablero_simulado[pos_origen] = None
+
+                    if not self.check_check(color, tablero_simulado):
+                        return False 
+        return True
 
 """
+Timeline:
+1. Se quiere mover una pieza de A a B
+2. Se simula dicho movimiento en una copia o versión temporal del tablero
+3. Se controla si el rey propio esta en jaque
+4. Si devuelve True (estoy en check), el movimiento es ILEGAL y se lo borra de legal moves
+5. Si devuelve False, el movimiento es válido
 
 
 
 
-
-
-pieces = [rook, knight, bishop, king, queen, bishop, knight, rook]
 
     def _move_piece_to_square(self, piece, square):
         if square isFree:
