@@ -11,8 +11,6 @@ Se tiene un tablero (matriz 8x8) con una posición inicial predeterminada, con l
 Hay piezas, cada una con su comportamiento específico. 
 La idea es que el jugador juega contra el agente. 
 
-Futura implementación: que se vea en pantalla y que rote 180° en cada turno.
-
 2. Creating New Environments
 To simulate a new world (e.g., a GridWorld or Traffic Simulation), you must implement new classes on the server side:
 
@@ -30,59 +28,228 @@ from statebuffer import IStateBuffer
 from environments import SimulatedEnvironment
 
 class chessPiece:
+    #Defino esto para poder usar en la conversión de [x,y] a una posición (a1 por ejemplo)
+    letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+    
+    numeros = ['1', '2', '3', '4', '5', '6', '7', '8']
+
     def __init__(self, color):
         self.color = color
-        self.simbolo = None 
+
+    def check_legal(self, posFinal, tablero):
+        col = posFinal[0]
+        fil = posFinal[1]
+        #controlo que no se vaya de los límites del tablero
+        if not (0 <= col <= 7 and 0 <= fil <= 7):
+            return False
+        
+        destino = tablero.get(self.letras[col] + self.numeros[fil])
+        #si no hay ninguna pieza/hay una pero es enemiga, devuelvo true. De lo contrario devuelvo false
+        if destino is None:
+            return True
+        elif destino.color != self.color:
+            return True
+        else:
+            return False
+
 
 class Pawn(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
-    def legal_moves(self):  #
+    def legal_moves(self, posInicio, posFin):  
+        moves = []
         pass
+#Si es el turno 1 o 2, fijarse de on passeant
+#Si es cualquier otro turno, fijarse si es para adelante o para los costados.
+#Si es para adelante (misma letra, distinto número), fijarse que no haya otra pieza adelante.
+#Si es para los costados (letras adyacentes con número + 1), fijarse que haya una pieza enemiga.
+
 
 class Queen(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
-    def legal_moves(self):  #
-        pass
+    def legal_moves(self,posInicio, tablero): 
+        moves = []
+
+        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        fila = posActual[0]
+        col = posActual[1]
+
+        direcciones = [
+        (1, 0), (-1, 0), (0, 1), (0, -1), #direcciones de la torre
+        (1, 1), (1, -1), (-1, 1), (-1, -1) #direcciones del alfil
+        ]
+
+        for dir_fila, dir_col in direcciones:
+            for i in range(1, 8):
+                nueva_fila = fila + (dir_fila * i)
+                nueva_col = col + (dir_col * i)
+                if self.check_legal([nueva_col, nueva_fila], tablero):
+                    moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
+                    if tablero.get(self.letras[nueva_col] + self.numeros[nueva_fila]) is not None:
+                        break
+                else:
+                    break
+        return moves
+#Lógica de la torre + el alfil
+
 
 class Rook(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
-    def legal_moves(self):  #
-        pass
+    #consigo los movimientos legales para una torre a partir de su posición en el tablero
+    def legal_moves(self, posInicio, tablero):  
+        moves = []
+
+        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        fila = posActual[0]
+        col = posActual[1]
+
+        direcciones = [
+            (1, 0),  # Arriba (aumenta fila)
+            (-1, 0), # Abajo (disminuye fila)
+            (0, 1),  # Derecha (aumenta columna)
+            (0, -1)  # Izquierda (disminuye columna)
+        ]
+
+        for dir_fila, dir_col in direcciones:
+            for i in range(1, 8):
+                nueva_fila = fila + (dir_fila * i)
+                nueva_col = col + (dir_col * i)
+                if self.check_legal([nueva_col, nueva_fila], tablero):
+                    moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
+                    #como check_legal devuelve true si el espacio está vacio o hay una pieza enemiga,
+                    #con esto me fijo si hay una pieza enemiga. En ese caso, detengo el movimiento en esa
+                    #dirección
+                    if tablero.get(self.letras[nueva_col] + self.numeros[nueva_fila]) is not None:
+                        break
+                else:
+                    break
+        return moves
+
 
 class Knight(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
-    def legal_moves(self):  #
-        pass
+    def legal_moves(self, posInicio, tablero):  
+        moves = []
+
+        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        fila = posActual[0]
+        col = posActual[1]
+        #(fila, columna)
+        direcciones = [
+            #una columna menos, dos filas más
+            (2,-1),
+            #una columna mas, dos filas mas
+            (2, 1),
+            #una columna menos, dos filas menos
+            (-2, -1),
+            #una columna mas, dos filas menos
+            (-2, 1),
+            #dos columnas menos, una fila mas
+            (1, -2),
+            #dos columnas menos, una fila menos
+            (-1, -2),
+            #dos columnas mas, una fila mas
+            (1, 2),
+            #dos columnas mas, una fila menos
+            (-1, 2)
+        ]
+
+        for dir_fila, dir_col in direcciones:
+                nueva_fila = fila + dir_fila
+                nueva_col = col + dir_col
+                if self.check_legal([nueva_col, nueva_fila], tablero):
+                    moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
+        return moves
 
 
 class Bishop(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
-    def legal_moves(self):  #
-        pass
+    def legal_moves(self,posInicio, tablero):  
+        moves = []
+        
+        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        fila = posActual[0]
+        col = posActual[1]
+
+        direcciones = [
+            #diagonal superior derecha
+            (1, 1),
+            #diagonal superior izquierda 
+            (1, -1),
+            #diagonal inferior derecha
+            (-1, 1), 
+            #diagonal inferior izquierda
+            (-1, -1)
+        ]
+
+        for dir_fila, dir_col in direcciones:
+            for i in range(1, 8):
+                nueva_fila = fila + (dir_fila * i)
+                nueva_col = col + (dir_col * i)
+                if self.check_legal([nueva_col, nueva_fila], tablero):
+                    moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
+                    if tablero.get(self.letras[nueva_col] + self.numeros[nueva_fila]) is not None:
+                        break
+                else:
+                    break
+        return moves
+
 
 class King(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
-    def legal_moves(self):
-        pass
+    def legal_moves(self, posInicio, tablero):  
+        moves = []
+
+        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        fila = posActual[0]
+        col = posActual[1]
+
+        direcciones = [
+            (1, 0),  # arriba (aumenta fila)
+            (-1, 0), # abajo (disminuye fila)
+            (0, 1),  # derecha (aumenta columna)
+            (0, -1),  # izquierda (disminuye columna)
+            (1, 1), #arriba a la derecha (aumenta fila y columna)
+            (-1, 1), #abajo a la derecha (disminuye fila y aumenta columna)
+            (1, -1), # arriba a la izquierda (aumenta fila y disminuye columna)
+            (-1, -1) #abajo a la izquierda (disminuye fila y columna)
+
+        ]
+
+        for dir_fila, dir_col in direcciones:
+                nueva_fila = fila + dir_fila
+                nueva_col = col + dir_col 
+                if self.check_legal([nueva_col, nueva_fila], tablero):
+                    moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
+                    if tablero.get(self.letras[nueva_col] + self.numeros[nueva_fila]) is not None:
+                        break
+                else:
+                    break
+        return moves
+#La posición final está en:
+#La misma letra: el número es +-1
+#Letras adyacentes: número +-1 o el mismo 
     def checkmate(self):
         if ...:
            return True # gg
 
+
 class chessEnv(SimulatedEnvironment):
+   
     #Este diccionario es simplemente para ayudar despues con los movimientos, lo pongo como una variable
-    #acá porque lo van a usar todos los tableros que se hagan
+    #acá porque lo van a usar todos los tableros que se hagan. El punto es: a1: [0,0], a2: [0,1], etc.
+    #Nota a futuro: esto devuelve fila,columna
     mapeoCoordenadas = {
         col + fila: [i, j] for i, fila in enumerate('12345678') for j, col in enumerate('abcdefgh') 
     }
@@ -92,6 +259,7 @@ class chessEnv(SimulatedEnvironment):
     
     
     #Este diccionaro es el tablero que va a tener las piezas
+    @staticmethod
     def crearTablero():
         columnas = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
         filas = ['1', '2', '3', '4', '5', '6', '7', '8']
@@ -104,6 +272,7 @@ class chessEnv(SimulatedEnvironment):
     
 
     #Esta función va a poner las piezas (que van a ser clases) en el tablero principal
+    @staticmethod
     def rellenarTablero(tablero):
         tablero['a8'] = Rook('black')
         tablero['h8'] = Rook('black')
@@ -138,7 +307,8 @@ class chessEnv(SimulatedEnvironment):
         tablero['f1'] = Bishop('white')
         tablero['d1'] = Queen('white')
         tablero['e1'] = King('white')
-        
+        return tablero
+    
     def crearYRellenarTablero(self):
         tablero = self.crearTablero()
         self.rellenarTablero(tablero)
@@ -148,27 +318,14 @@ class chessEnv(SimulatedEnvironment):
     def __init__(self):
         super(chessEnv, self).__init__()
         self._tablero = self.crearYRellenarTablero()
-        self._tablero = self.crearTablero()
         self._tableroCoordenadas = chessEnv.mapeoCoordenadas
-        self.rellenarTablero()
 
 
 
 
 
 """
-Posibles lógicas de movimiento
-1. 
-Cada pieza tiene una lista de los posibles movimientos dependiendo de su posición.
-Se hace dicho movimiento.
 
-2. 
-Cada pieza tiene una lógica de movimiento (esta es la más complicada creo)
-Se calculan los posibles movimientos en base a la posición y a la lógica de movimiento que tiene.
-
-3. 
-Se le pasa a la pieza su posición de inicio y su posición de fin deseada.
-La pieza verifica cosas en base a la posición de fin deseada. 
 
 
 
