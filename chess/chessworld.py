@@ -10,6 +10,12 @@ Se tiene un tablero (matriz 8x8) con una posición inicial predeterminada, con l
 (nomenclatura estándar).
 Hay piezas, cada una con su comportamiento específico. 
 La idea es que el jugador juega contra el agente. 
+
+TO-DO list:
+- FEN
+- On peassant
+- Agregar contador de turnos para determinadas reglas 
+- Crear funcion que termine timeline
 """
 from statebuffer import IStateBuffer
 from environments import SimulatedEnvironment
