@@ -13,8 +13,6 @@ La idea es que el jugador juega contra el agente.
 
 TO-DO list:
 - FEN
-- On peassant
-- Agregar contador de turnos para determinadas reglas 
 - Crear funcion que termine timeline
 """
 from statebuffer import IStateBuffer
@@ -100,7 +98,6 @@ class Pawn(chessPiece):
                             moves.append(destino_diagonal)
         return moves
     
-
 
 class Queen(chessPiece):
     def __init__(self, color):
@@ -288,11 +285,10 @@ class chessEnv(SimulatedEnvironment):
             self._agents_colors[agent_id] = "white"
         else:
             self._agents_colors[agent_id] = "black"
-    
+
     def remove(self, agent_id: int) -> None:
         super(chessEnv, self).remove(agent_id)
         self._agents_colors.pop(agent_id, None)
-    
     
     #Este diccionaro es el tablero que va a tener las piezas
     @staticmethod
@@ -306,7 +302,6 @@ class chessEnv(SimulatedEnvironment):
                 tablero[posicion] = None 
         return tablero
     
-
     #Esta función va a poner las piezas (que van a ser clases) en el tablero principal
     @staticmethod
     def rellenarTablero(tablero):
@@ -350,7 +345,6 @@ class chessEnv(SimulatedEnvironment):
         self.rellenarTablero(tablero)
         return tablero
 
-
     def __init__(self):
         super(chessEnv, self).__init__()
         self._tablero = self.crearYRellenarTablero()
@@ -362,6 +356,70 @@ class chessEnv(SimulatedEnvironment):
             "fifty_move_clock": 0,
             "en_passant_target" : None,
         }
+
+    #falta parte de enroque
+    def FEN_board_loader(self, fen_string):
+        fen_parts = fen_string.split()
+        fen_rows = fen_parts[0].split("/")
+
+        #en fen es al reves primero
+        filas = ["8", "7", "6", "5", "4", "3", "2", "1"]
+        columnas = ["a","b","c","d","e","f","g","h"]
+
+        piece_classes = {
+            'p': Pawn, 
+            'n': Knight, 
+            'b': Bishop, 
+            'r': Rook, 
+            'q': Queen, 
+            'k': King
+        }
+
+        self._tablero = self.crearTablero()
+
+        for i, row_string in enumerate(fen_rows):
+            fila_actual = filas[i]
+            col = 0
+            
+            for char in row_string:
+                if char.isdigit():
+                    # si es un número, saltamos esa cantidad de columnas vacías
+                    col += int(char)
+                else:
+                    if char.isupper():
+                        color = "white"
+                    else: 
+                        color = "black"
+                    clase_pieza = piece_classes[char.lower()]
+
+                    nueva_pieza = clase_pieza(color)
+                    
+                    coord = columnas[col] + fila_actual
+                    self._tablero[coord] = nueva_pieza
+                    
+                    col += 1
+
+        ep_target = fen_parts[3]
+        if ep_target == '-':
+            self._game_info["en_passant_target"] = None
+        else:
+            self._game_info["en_passant_target"] = ep_target
+
+        self._game_info["fifty_move_clock"] = int(fen_parts[4])
+
+        full_move_number = int(fen_parts[5])
+        active_color = fen_parts[1]
+
+        base_counter = (full_move_number - 1) * 2
+        if active_color == 'b':
+            base_counter += 1
+        
+        self._game_info["move_counter"] = base_counter
+
+
+    def color_check(self, agent_id): 
+        color = self._agents_colors.get(agent_id)
+        return color
 
     #se fija si, dado un tablero, el rey esta en jaque 
     @staticmethod
@@ -385,7 +443,21 @@ class chessEnv(SimulatedEnvironment):
                 if king_pos in pieza.legal_moves(pos, tablero):
                     return True 
         return False
-    
+     
+    #esta funcion sirve para ver si un movimiento no va a poner al rey en jaque. Implementa 123 de la timeline
+    @staticmethod
+    def safe_movement(origen, destino, color, tablero):
+        copia_tablero = tablero.copy()
+
+        pieza = copia_tablero[origen]
+        copia_tablero[destino] = pieza
+        copia_tablero[origen] = None
+
+        if chessEnv.check_check(color, copia_tablero):
+            return False 
+        else:
+            return True 
+        
     @staticmethod
     def has_movements(color,tablero, en_passant_target=None):
         for pos_origen, pieza in tablero.items():
@@ -399,7 +471,6 @@ class chessEnv(SimulatedEnvironment):
                         return True
         return False
 
-    
     @staticmethod
     def check_mate(color, tablero, en_passant_target=None):
         if not chessEnv.check_check(color, tablero):
@@ -415,21 +486,6 @@ class chessEnv(SimulatedEnvironment):
             return False
         if chessEnv.has_movements(color, tablero, en_passant_target):
             return False
-        else:
-            return True 
-        
-
-    #esta funcion sirve para ver si un movimiento no va a poner al rey en jaque. Implementa 123 de la timeline
-    @staticmethod
-    def safe_movement(origen, destino, color, tablero):
-        copia_tablero = tablero.copy()
-
-        pieza = copia_tablero[origen]
-        copia_tablero[destino] = pieza
-        copia_tablero[origen] = None
-
-        if chessEnv.check_check(color, copia_tablero):
-            return False 
         else:
             return True 
 
@@ -536,12 +592,6 @@ class chessEnv(SimulatedEnvironment):
             self._tablero[destino] = pieza
             self._tablero[origen] = None
 
-
-    def color_check(self, agent_id): 
-        color = self._agents_colors.get(agent_id)
-        return color
-
-
     def get_property(self, agent_id: int, property_name: str) -> dict:
         if agent_id in self._agents:
             response = {"agent": agent_id}
@@ -562,7 +612,6 @@ class chessEnv(SimulatedEnvironment):
 
             return response
     
-
     def take_action(self, agent_id: int, action_name: str, params: dict = {}) -> None:
         if agent_id in self._agents:
             action_methods = {
@@ -576,13 +625,28 @@ class chessEnv(SimulatedEnvironment):
                 self._update_statebuffers(agent_id)
             else:
                 print(f"Invalid action: {action_name}")
+
+    def add_statebuffer(self, agent_id: int, statebuffer: IStateBuffer) -> None:
+        super(chessEnv, self).add_statebuffer(agent_id, statebuffer)
+        self._update_statebuffers(agent_id)
+
+    def remove_statebuffer(self, agent_id: int,statebuffer: IStateBuffer) -> None:
+        super(chessEnv, self).remove_statebuffer(agent_id, statebuffer)
+
+    def _update_statebuffers(self, agent_id: int):
+        relevant_statebuffers = [entry["statebuffer"] for entry in self._statebuffers if entry["agent_id"] == agent_id]
+        
+        if self._game_info["move_counter"] % 2 == 0:
+            turn_color = "white"
+        else:
+            turn_color = "black"
+
+        for statebuffer in relevant_statebuffers:
+            datos_juego = {
+                "tablero": self._tablero.copy(), 
+                "game_info": self._game_info.copy(),
+                "status": self.get_game_status(),
+                "turn_color": turn_color,
+            }
             
-    
-"""
-Timeline:
-1. Se quiere mover una pieza de A a B
-2. Se simula dicho movimiento en una copia o versión temporal del tablero
-3. Se controla si el rey propio esta en jaque
-4. Si devuelve True (estoy en check), el movimiento es ILEGAL y se lo borra de legal moves
-5. Si devuelve False, el movimiento es válido
-"""
+            statebuffer.update(datos_juego)

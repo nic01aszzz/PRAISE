@@ -97,6 +97,10 @@ class ChessAgent(Agent):
     def _act(self, percept):
         action = self.function(percept)
         
+        #innecesario esto, pero no está de mas asegurarse que no esté vacio
+        if not action:
+            return
+        
         action_actuators = {
             "move": (self._actuators["mover"], ["origen", "destino"]),
         }
