@@ -31,6 +31,7 @@ class chessPiece:
 
     def __init__(self, color):
         self.color = color
+        self.has_moved = False
 
     def check_legal(self, posFinal, tablero):
         col = posFinal[0]
@@ -263,6 +264,24 @@ class King(chessPiece):
                 nueva_col = col + dir_col 
                 if self.check_legal([nueva_col, nueva_fila], tablero):
                     moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
+        
+        #logica de enroque
+        if not self.has_moved:
+            string_fila = str(fila + 1)
+            #enroque corto
+            torre_k = tablero.get('h' + string_fila)
+            #controlo que no sea none, que sea una torre y que no se haya movido
+            if torre_k and type(torre_k).__name__ == "Rook" and not torre_k.has_moved:
+                #tengo que verificar que en las columnas f y g no haya nada
+                if tablero.get('f' + string_fila) is None and tablero.get('g' + string_fila) is None:
+                    moves.append('g' + string_fila) 
+
+            #enroque largo
+            torre_q = tablero.get('a' + string_fila)
+            if torre_q and type(torre_q).__name__ == "Rook" and not torre_q.has_moved:
+                if tablero.get('b' + string_fila) is None and tablero.get('c' + string_fila) is None and tablero.get('d' + string_fila) is None:
+                    moves.append('c' + string_fila)
+
         return moves
 
 
@@ -455,8 +474,24 @@ class chessEnv(SimulatedEnvironment):
 
         if chessEnv.check_check(color, copia_tablero):
             return False 
-        else:
-            return True 
+        
+        if type(pieza).__name__ == "King" and abs(ord(origen[0]) - ord(destino[0])) == 2:
+            #verificar si estoy en jaque 
+            if chessEnv.check_check(color, tablero): 
+                return False
+            
+            #no se puede enrocar si se pasa por jaque 
+            columna_media = (ord(origen[0]) + ord(destino[0])) // 2
+            casilla_media = chr(columna_media) + origen[1]
+
+            #uso otra copia porque quiero ver la posicion media
+            copia_tablero_dos = tablero.copy()
+            copia_tablero_dos[casilla_media] = pieza
+            copia_tablero_dos[origen] = None
+            
+            if chessEnv.check_check(color, copia_tablero_dos):
+                return False
+        return True
         
     @staticmethod
     def has_movements(color,tablero, en_passant_target=None):
@@ -542,6 +577,10 @@ class chessEnv(SimulatedEnvironment):
         else:
             pass
 
+        castle_check = False
+        if type(pieza).__name__ == "King" and abs(ord(origen[0]) - ord(destino[0])) == 2:
+            castle_check = True
+
         #me fijo que sea un movimiento seguro, si lo es, muevo, aumento el contador de movimientos y veo lo del reloj
         if chessEnv.safe_movement(origen, destino, agent_color, self._tablero):
             #hago los preparativos para los checkeos
@@ -561,6 +600,16 @@ class chessEnv(SimulatedEnvironment):
             
             #hago el movimiento
             self.make_mov(origen, destino)
+
+            if castle_check:
+                fila = origen[1]
+                # enroque corto (torre de h a f)
+                if destino[0] == 'g': 
+                    self.make_mov('h' + fila, 'f' + fila)
+                
+                # enroque largo (torre de a a d)
+                elif destino[0] == 'c':
+                    self.make_mov('a' + fila, 'd' + fila)
 
             #controlo el en_passant_target
             if (type(pieza).__name__ == "Pawn"):
@@ -591,6 +640,7 @@ class chessEnv(SimulatedEnvironment):
             pieza = self._tablero[origen]
             self._tablero[destino] = pieza
             self._tablero[origen] = None
+            pieza.has_moved = True
 
     def get_property(self, agent_id: int, property_name: str) -> dict:
         if agent_id in self._agents:
@@ -647,6 +697,8 @@ class chessEnv(SimulatedEnvironment):
                 "game_info": self._game_info.copy(),
                 "status": self.get_game_status(),
                 "turn_color": turn_color,
+                #por las dudas lo paso explicito, no pasa nada con no hacerlo
+                "en_passant": self._game_info["en_passant_target"],
             }
             
             statebuffer.update(datos_juego)
