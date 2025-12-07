@@ -19,12 +19,17 @@ TO-DO list:
 """
 from statebuffer import IStateBuffer
 from environments import SimulatedEnvironment
+import random
 
 class chessPiece:
     #Defino esto para poder usar en la conversión de [x,y] a una posición (a1 por ejemplo)
     letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
     
     numeros = ['1', '2', '3', '4', '5', '6', '7', '8']
+
+    mapeoCoordenadas = {
+        col + fila: [i, j] for i, fila in enumerate('12345678') for j, col in enumerate('abcdefgh') 
+    }
 
     def __init__(self, color):
         self.color = color
@@ -50,10 +55,10 @@ class Pawn(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
-    def legal_moves(self, posInicio, tablero):
+    def legal_moves(self, posInicio, tablero, en_passant_target=None):
         moves = []
         
-        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        posActual = self.mapeoCoordenadas[posInicio]
         fila = posActual[0]
         col = posActual[1]
 
@@ -87,21 +92,24 @@ class Pawn(chessPiece):
                 #verifico que no me salga de los limites horizontales
                 if 0 <= columna <= 7:
                     # ahora si uso check_legal porque es para comer otra pieza
+                    destino_diagonal = self.letras[columna] + self.numeros[fila_frente]
                     if self.check_legal([columna, fila_frente], tablero):    
-                        if tablero.get(self.letras[columna] + self.numeros[fila_frente]) is not None:
-                            moves.append(self.letras[columna] + self.numeros[fila_frente])
+                        if tablero.get(destino_diagonal) is not None:
+                            moves.append(destino_diagonal)
+                        elif en_passant_target is not None and destino_diagonal == en_passant_target:
+                            moves.append(destino_diagonal)
         return moves
-    #falta implementar on peassant
+    
 
 
 class Queen(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
-    def legal_moves(self,posInicio, tablero): 
+    def legal_moves(self, posInicio, tablero): 
         moves = []
 
-        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        posActual = self.mapeoCoordenadas[posInicio]
         fila = posActual[0]
         col = posActual[1]
 
@@ -131,7 +139,7 @@ class Rook(chessPiece):
     def legal_moves(self, posInicio, tablero):  
         moves = []
 
-        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        posActual = self.mapeoCoordenadas[posInicio]
         fila = posActual[0]
         col = posActual[1]
 
@@ -165,7 +173,7 @@ class Knight(chessPiece):
     def legal_moves(self, posInicio, tablero):  
         moves = []
 
-        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        posActual = self.mapeoCoordenadas[posInicio]
         fila = posActual[0]
         col = posActual[1]
         #(fila, columna)
@@ -203,7 +211,7 @@ class Bishop(chessPiece):
     def legal_moves(self,posInicio, tablero):  
         moves = []
         
-        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        posActual = self.mapeoCoordenadas[posInicio]
         fila = posActual[0]
         col = posActual[1]
 
@@ -238,7 +246,7 @@ class King(chessPiece):
     def legal_moves(self, posInicio, tablero):  
         moves = []
 
-        posActual = chessEnv.mapeoCoordenadas[posInicio]
+        posActual = self.mapeoCoordenadas[posInicio]
         fila = posActual[0]
         col = posActual[1]
 
@@ -258,18 +266,7 @@ class King(chessPiece):
                 nueva_col = col + dir_col 
                 if self.check_legal([nueva_col, nueva_fila], tablero):
                     moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
-                    if tablero.get(self.letras[nueva_col] + self.numeros[nueva_fila]) is not None:
-                        break
-                else:
-                    break
         return moves
-    
-#La posición final está en:
-#La misma letra: el número es +-1
-#Letras adyacentes: número +-1 o el mismo 
-    def checkmate(self):
-        if ...:
-           return True # gg
 
 
 class chessEnv(SimulatedEnvironment):
@@ -283,6 +280,18 @@ class chessEnv(SimulatedEnvironment):
 
     def __new__(cls):
         return super().__new__(cls)
+    
+    def add(self, agent_id: int) -> None:
+        super(chessEnv, self).add(agent_id)
+        random_number = random.randint(1,2)
+        if random_number == 1:
+            self._agents_colors[agent_id] = "white"
+        else:
+            self._agents_colors[agent_id] = "black"
+    
+    def remove(self, agent_id: int) -> None:
+        super(chessEnv, self).remove(agent_id)
+        self._agents_colors.pop(agent_id, None)
     
     
     #Este diccionaro es el tablero que va a tener las piezas
@@ -346,15 +355,26 @@ class chessEnv(SimulatedEnvironment):
         super(chessEnv, self).__init__()
         self._tablero = self.crearYRellenarTablero()
         self._tableroCoordenadas = chessEnv.mapeoCoordenadas
+        self._agents = []
+        self._agents_colors = {}
+        self._game_info = {
+            "move_counter" : 0,
+            "fifty_move_clock": 0,
+            "en_passant_target" : None,
+        }
 
-    def check_check(self, color_rey, tablero):
+    #se fija si, dado un tablero, el rey esta en jaque 
+    @staticmethod
+    def check_check(color_rey, tablero):
         king_pos = None
+
         for pos, pieza in tablero.items():
             if pieza is not None:
+                # Usamos type().__name__ para evitar imports circulares
                 if type(pieza).__name__ == "King" and pieza.color == color_rey:
                     king_pos = pos
                     break
-
+        
         if color_rey == "white":
             enemy_color = "black" 
         else:
@@ -364,136 +384,189 @@ class chessEnv(SimulatedEnvironment):
             if pieza is not None and pieza.color == enemy_color:
                 if king_pos in pieza.legal_moves(pos, tablero):
                     return True 
- 
         return False
-
-    #esta funcion sirve para ver si un movimiento no va a poner al rey en jaque. Implementa 123 de la timeline
-    def safe_movement(self, pos_origen, pos_destino, color):
-        copia_tablero = self._tablero.copy()
-        pieza = copia_tablero[pos_origen]
-        
-        copia_tablero[pos_destino] = pieza
-        copia_tablero[pos_origen] = None
-
-        if self.check_check(color, copia_tablero):
-            return False 
-        else:
-            return True
-
-    def check_mate(self, color, tablero):
-        #si no hay jaque, no hay mate
-        if not self.check_check(color, tablero):
-            return False
-
-        #buscamos en todas las piezas del mismo color si hay alguna que evite el check, de lo contrario, es checkmate
+    
+    @staticmethod
+    def has_movements(color,tablero, en_passant_target=None):
         for pos_origen, pieza in tablero.items():
             if pieza is not None and pieza.color == color:
-                movimientos = pieza.legal_moves(pos_origen, tablero)
+                if type(pieza).__name__ == "Pawn":
+                    posibles = pieza.legal_moves(pos_origen, tablero, en_passant_target)
+                else:
+                    posibles = pieza.legal_moves(pos_origen, tablero)
+                for pos_destino in posibles:
+                    if chessEnv.safe_movement(pos_origen, pos_destino,color, tablero):
+                        return True
+        return False
 
-                for pos_destino in movimientos:
-                    tablero_simulado = tablero.copy()
-                    tablero_simulado[pos_destino] = pieza
-                    tablero_simulado[pos_origen] = None
-
-                    if not self.check_check(color, tablero_simulado):
-                        return False 
-        return True
-
-"""
-Timeline:
-1. Se quiere mover una pieza de A a B
-2. Se simula dicho movimiento en una copia o versión temporal del tablero
-3. Se controla si el rey propio esta en jaque
-4. Si devuelve True (estoy en check), el movimiento es ILEGAL y se lo borra de legal moves
-5. Si devuelve False, el movimiento es válido
-
-
-
-
-
-    def _move_piece_to_square(self, piece, square):
-        if square isFree:
-            #Mover pieza
+    
+    @staticmethod
+    def check_mate(color, tablero, en_passant_target=None):
+        if not chessEnv.check_check(color, tablero):
+            return False
+        if not chessEnv.has_movements(color, tablero, en_passant_target):
+            return True
         else:
-            #Mover pieza y eliminar la otra
+            return False
+        
+    @staticmethod
+    def check_stalemate(color, tablero, en_passant_target=None):
+        if chessEnv.check_check(color, tablero):
+            return False
+        if chessEnv.has_movements(color, tablero, en_passant_target):
+            return False
+        else:
+            return True 
+        
 
-    def __init__(self, length: int, random_dirt=False):
-        super(VacuumEnvironment, self).__init__()
-        self._length = length
-        self._agents_locations = {}                     # maps agent id with its location
-        self._dirt_locations = set()
-        if random_dirt:
-            self.random_dirt(length // 2)
+    #esta funcion sirve para ver si un movimiento no va a poner al rey en jaque. Implementa 123 de la timeline
+    @staticmethod
+    def safe_movement(origen, destino, color, tablero):
+        copia_tablero = tablero.copy()
 
-    def add(self, agent_id: int) -> None:
-        super(VacuumEnvironment, self).add(agent_id)
-        self._agents_locations[agent_id] = 0
+        pieza = copia_tablero[origen]
+        copia_tablero[destino] = pieza
+        copia_tablero[origen] = None
 
-    def remove(self, agent_id: int) -> None:
-        super(VacuumEnvironment, self).remove(agent_id)
-        self._agents_locations.pop(agent_id, None)
+        if chessEnv.check_check(color, copia_tablero):
+            return False 
+        else:
+            return True 
 
-    def add_statebuffer(self, agent_id: int, statebuffer: IStateBuffer) -> None:
-        super(VacuumEnvironment, self).add_statebuffer(agent_id, statebuffer)
-        statebuffer.update({"length": self._length, "agent_location": self._location_of(agent_id),
-                         "dirt_location": self._dirt_locations})
+    #es medio el "arbitro" esta funcion
+    def get_game_status(self):
+        """
+        El juego solo tiene 4 estados posibles:
+        - En progreso (in_progress)
+        - Ganaron blancas (white_won)
+        - Ganaron negras (black_won)
+        - Rey ahogado (stalemate)
+        - Empate por 50 jugadas (draw_by_50_moves)
+        """
+        
+        if self._game_info["fifty_move_clock"] >= 100:
+            return "draw_by_50_moves"
+        
+        if self._game_info["move_counter"] % 2 == 0:
+            turn = "white"  
+        else:
+            turn = "black" 
+        
+        ep_target = self._game_info["en_passant_target"]
 
-    def remove_statebuffer(self, agent_id: int,statebuffer: IStateBuffer) -> None:
-        super(VacuumEnvironment, self).remove_statebuffer(agent_id, statebuffer)
+        # Verificamos estados finales
+        if chessEnv.check_mate(turn, self._tablero, ep_target):
+            if turn == "white":
+                return "black_won"
+            else:
+                return "white_won"            
+        elif chessEnv.check_stalemate(turn, self._tablero, ep_target):
+            return "stalemate"
+        else:
+            return "in_progress"
+    
+    def _handle_move(self, agent_id: int, origen, destino: str) -> None:
+        #validamos que hayan entrado dos argumentos
+        if not origen or not destino:
+            print(f"Error: Invalid Movement {origen}->{destino}")
+            return
+        
+        pieza = self._tablero.get(origen)
+        agent_color = self._agents_colors.get(agent_id)
+        flag_ep = False
 
-    def random_dirt(self, number_dirty_locations):
-        self._dirt_locations = self._dirt_locations.union(set(random.sample(range(self._length),
-                                                                            k=number_dirty_locations)))
+        #validamos que haya una pieza que mover y que sea del mismo color que el agente
+        if pieza is None:
+            print("Error: there is no piece in that position to move!")
+            return
+        elif pieza.color != agent_color:
+            print("Error: wrong color")
+            #ver como devolver esto
+            return
+        else:
+            pass
 
-    def _is_dirty_in_location(self, x: int) -> bool:
-        return x in self._dirt_locations
+        #me fijo que sea un movimiento seguro, si lo es, muevo, aumento el contador de movimientos y veo lo del reloj
+        if chessEnv.safe_movement(origen, destino, agent_color, self._tablero):
+            #hago los preparativos para los checkeos
+            pieza_destino = self._tablero[destino]
 
-    def _location_of(self, agent_id: int) -> int:
-        return self._agents_locations[agent_id] if agent_id in self._agents_locations else None
+            #controlo en passant
+            if type(pieza).__name__ == "Pawn" and pieza_destino is None:
+                coord_origen = self._tableroCoordenadas[origen]
+                coord_destino = self._tableroCoordenadas[destino]
+                
+                if coord_origen[1] != coord_destino[1]:
+                    flag_ep = True
+                    self._tablero[destino[0] + origen[1]] = None
+
+            self._game_info["move_counter"] += 1
+            self._game_info["en_passant_target"] = None
+            
+            #hago el movimiento
+            self.make_mov(origen, destino)
+
+            #controlo el en_passant_target
+            if (type(pieza).__name__ == "Pawn"):
+                coord_origen = self._tableroCoordenadas[origen]
+                coord_destino = self._tableroCoordenadas[destino]
+                
+                fila_orig = coord_origen[0]
+                fila_dest = coord_destino[0]
+
+                if (abs(fila_dest - fila_orig)) == 2:
+                    self._game_info["en_passant_target"] = chessPiece.letras[coord_origen[1]] + chessPiece.numeros[(fila_orig + fila_dest) // 2]
+
+            #controlo el fifty_move_clock
+            if (type(pieza).__name__ == "Pawn") or (pieza_destino is not None) or (flag_ep):
+                self._game_info["fifty_move_clock"] = 0
+            else:
+                self._game_info["fifty_move_clock"] += 1
+            
+            status = self.get_game_status()
+            if status != "in_progress":
+                #ver que hacer
+                print(f"Game ended! Final status: {status}!")
+        else:
+            print(f"Invalid movement: {origen} to {destino}")
+
+
+    def make_mov(self, origen, destino):
+            pieza = self._tablero[origen]
+            self._tablero[destino] = pieza
+            self._tablero[origen] = None
+
+
+    def color_check(self, agent_id): 
+        color = self._agents_colors.get(agent_id)
+        return color
+
 
     def get_property(self, agent_id: int, property_name: str) -> dict:
         if agent_id in self._agents:
             response = {"agent": agent_id}
-
+            #en caso de tener más métodos, ponerlos aca
             property_methods = {
-                "location": self._location_of,
-                "dirty": lambda agent_id: self._is_dirty_in_location(self._location_of(agent_id)),
+                "tablero": lambda x: self._tablero,                    
+                "color": self.color_check,                         
+                "game_state": lambda x: self.get_game_status(),        
+                "en_passant": lambda x: self._game_info["en_passant_target"],
             }
 
             property_method = property_methods.get(property_name)
 
             if property_method:
-                response[property_name] = property_method(agent_id)
+                response[property_name] = property_method(agent_id) #el (agent_id) es para ejecutar el self._tablero
             else:
                 print(f"Invalid property: {property_name}")
 
             return response
-        else:
-            return {}
-
-    def _handle_move(self, agent_id: int, direction: str) -> None:
-        if direction == "left":
-            self._move_agent_left(agent_id)
-        elif direction == "right":
-            self._move_agent_right(agent_id)
-        else:
-            print(f"Invalid direction: {direction}")
-
-    def _move_agent_left(self, agent_id: int):
-        self._agents_locations[agent_id] = max(self._agents_locations[agent_id] - 1, 0)
-
-    def _move_agent_right(self, agent_id: int):
-        self._agents_locations[agent_id] = min(self._agents_locations[agent_id] + 1, self._length - 1)
-
-    def _make_clean(self, agent_id: int):
-        location = self._location_of(agent_id)
-        self._dirt_locations.discard(location)
+    
 
     def take_action(self, agent_id: int, action_name: str, params: dict = {}) -> None:
         if agent_id in self._agents:
             action_methods = {
-                "move": (self._handle_move, ["direction"]),
-                "clean": (self._make_clean, []),
+                "move": (self._handle_move, ["origen", "destino"])
             }
 
             action_method, expected_params = action_methods.get(action_name, (None, None))
@@ -503,10 +576,13 @@ Timeline:
                 self._update_statebuffers(agent_id)
             else:
                 print(f"Invalid action: {action_name}")
-
-    def _update_statebuffers(self, agent_id: int):
-        relevant_statebuffers = [entry["statebuffer"] for entry in self._statebuffers if entry["agent_id"] == agent_id]
-        for statebuffer in relevant_statebuffers:
-            statebuffer.update({"length": self._length, "agent_location": self._location_of(agent_id),
-                             "dirt_location": self._dirt_locations})
+            
+    
+"""
+Timeline:
+1. Se quiere mover una pieza de A a B
+2. Se simula dicho movimiento en una copia o versión temporal del tablero
+3. Se controla si el rey propio esta en jaque
+4. Si devuelve True (estoy en check), el movimiento es ILEGAL y se lo borra de legal moves
+5. Si devuelve False, el movimiento es válido
 """
