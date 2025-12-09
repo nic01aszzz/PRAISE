@@ -574,8 +574,14 @@ class chessEnv(SimulatedEnvironment):
             print("Error: wrong color")
             #ver como devolver esto
             return
+        elif type(pieza).__name__ == "Pawn":
+            legal_moves = pieza.legal_moves(origen, self._tablero, self._game_info["en_passant_target"])
         else:
-            pass
+            legal_moves = pieza.legal_moves(origen, self._tablero)
+        
+        if destino not in legal_moves:
+            print(f"Illegal move: {type(pieza).__name__} cannot move from {origen} to {destino}")
+            return
 
         castle_check = False
         if type(pieza).__name__ == "King" and abs(ord(origen[0]) - ord(destino[0])) == 2:
