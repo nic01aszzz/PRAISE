@@ -10,7 +10,6 @@ class ConsoleRenderer(IRenderer):
     def observe(self, statebuffer):
         self.environment_statebuffer = statebuffer
     
-    #cambiar
     def render(self):
         state = self.environment_statebuffer.get_state()
         if state:
@@ -29,13 +28,17 @@ class ConsoleRenderer(IRenderer):
                     if pieza is None:
                         fila_visual += ". "
                     else:
-                        # se muestra la inicial de la clase (P, K, Q...)
-                        nombre = type(pieza).__name__[0] 
+                        if type(pieza).__name__ == "Knight":
+                            nombre = type(pieza).__name__[1]
+                        else:
+                            nombre = type(pieza).__name__[0] 
                 
                         if pieza.color == "black":
                             nombre = nombre.lower()
-                        fila_visual += nombre
-                print(fila_visual + f" | {fila}")
+                        else:
+                            nombre = nombre.upper()
+                        fila_visual += nombre + " "
+                print(fila_visual + f"| {fila}")
                 
             print("  -----------------")
             print("   a b c d e f g h\n")

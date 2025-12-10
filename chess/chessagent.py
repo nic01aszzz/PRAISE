@@ -5,7 +5,7 @@ from agents import Agent
 import random
 from chessworld import chessEnv
 
-
+#sensor que le brinda al agente el tablero
 class BoardSensor(SimulatedSensor):
     #creo q ya esta
     def sense(self):
@@ -13,11 +13,13 @@ class BoardSensor(SimulatedSensor):
         return response["tablero"]
     
 
+#sensor que le brinda al agente su color
 class ColorSensor(SimulatedSensor):
     def sense(self):
         response = self._env.get_property(self._agent.id, property_name="color")
         return response["color"]
     
+#sensor que le brinda al agente información del juego (si termino, en passant, etc)
 class GameStateSensor(SimulatedSensor):
     def sense(self):
         response = self._env.get_property(self._agent.id, property_name="game_state")
@@ -36,6 +38,8 @@ class MoverActuator(SimulatedActuator):
 
 
 class ChessAgent(Agent):
+    #la funcion general del agente. en base a la informacion que percibe, toma los posibles movimientos y realiza uno
+    #al azar
     def function(self, percept):
         action = {}
         my_color = percept["color_sensor"]
@@ -55,14 +59,14 @@ class ChessAgent(Agent):
                 for pos_destino in possible_moves:
                     if chessEnv.safe_movement(pos_origen, pos_destino, my_color, my_board):
                         valid_moves.append((pos_origen, pos_destino))
-
+                        
         if valid_moves:
             move = random.choice(valid_moves)
             action["name"] = "move"
             action["params"] = {"origen": move[0], "destino": move[1]}
         return action
 
-  
+    
     def __init__(self, env: SimulatedEnvironment):
         super().__init__()
         env.add(self.id)
@@ -87,13 +91,14 @@ class ChessAgent(Agent):
         en_passant_sensor.agent = self
         self.add_sensor("en_passant_sensor", en_passant_sensor)
 
-    #creo q ya esta
+    #usa los sensores 
     def _perceive(self):
         percept = {}
         for sensor in self._sensors:
             percept[sensor] = self._sensors[sensor].sense()
         return percept
 
+    #en base a lo que percibio, llama a function y le manda la informacion al entorno con su actuador
     def _act(self, percept):
         action = self.function(percept)
         
@@ -110,7 +115,7 @@ class ChessAgent(Agent):
             args = [action["params"].get(param) for param in expected_params]
             actuator.act(*args)
 
-    #creo q ya esta
+    #ciclo de percibir y actuar
     def behave(self):
         percept = self._perceive()
         self._act(percept)

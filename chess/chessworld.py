@@ -12,8 +12,8 @@ Hay piezas, cada una con su comportamiento específico.
 La idea es que el jugador juega contra el agente. 
 
 TO-DO list:
-- FEN
-- Crear funcion que termine timeline
+- Implementar FREESTYLE CHESS
+- Implementar tiempo
 """
 from statebuffer import IStateBuffer
 from environments import SimulatedEnvironment
@@ -678,20 +678,19 @@ class chessEnv(SimulatedEnvironment):
             if action_method:
                 args = [agent_id] + [params.get(param) for param in expected_params]
                 action_method(*args)
-                self._update_statebuffers(agent_id)
+                self._update_statebuffers()
             else:
                 print(f"Invalid action: {action_name}")
 
     def add_statebuffer(self, agent_id: int, statebuffer: IStateBuffer) -> None:
         super(chessEnv, self).add_statebuffer(agent_id, statebuffer)
-        self._update_statebuffers(agent_id)
+        self._update_statebuffers()
 
     def remove_statebuffer(self, agent_id: int,statebuffer: IStateBuffer) -> None:
         super(chessEnv, self).remove_statebuffer(agent_id, statebuffer)
 
-    def _update_statebuffers(self, agent_id: int):
-        relevant_statebuffers = [entry["statebuffer"] for entry in self._statebuffers if entry["agent_id"] == agent_id]
-        
+    def _update_statebuffers(self):
+        relevant_statebuffers = [entry["statebuffer"] for entry in self._statebuffers]        
         if self._game_info["move_counter"] % 2 == 0:
             turn_color = "white"
         else:

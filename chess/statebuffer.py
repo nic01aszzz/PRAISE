@@ -32,8 +32,13 @@ class StateBuffer(IStateBuffer):
         self.changed = True
 
     def get_state(self):
+
+        return self.state
+"""
+    def get_state(self):
         if self.changed:
             self.changed = False
             return self.state
         else:
             return None
+"""
