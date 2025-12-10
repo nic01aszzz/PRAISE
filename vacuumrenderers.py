@@ -4,18 +4,16 @@ import pygame
 from renderers import IRenderer
 
 
-#sirve para ver en la consola
+
 class ConsoleRenderer(IRenderer):
     def __init__(self):
         self.environment_statebuffer = {}
 
-    #guarda el estado
+
     def observe(self, statebuffer):
         self.environment_statebuffer = statebuffer
 
-    
     def render(self):
-        #obtiene el estado
         state = self.environment_statebuffer.get_state()
         if state:
             data = []
