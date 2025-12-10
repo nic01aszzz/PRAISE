@@ -3,45 +3,58 @@ import time
 import pygame
 from renderers import IRenderer
 
-
-#sirve para ver en la consola
 class ConsoleRenderer(IRenderer):
     def __init__(self):
         self.environment_statebuffer = {}
 
-    #guarda el estado
     def observe(self, statebuffer):
         self.environment_statebuffer = statebuffer
-
     
     def render(self):
-        #obtiene el estado
         state = self.environment_statebuffer.get_state()
         if state:
-            data = []
-            length = state["length"]
-            for i in range(length):
-                if i == state["agent_location"] and i in state["dirt_location"]:
-                    data.append('#')
-                elif i == state["agent_location"]:
-                    data.append('o')
-                elif i in state["dirt_location"]:
-                    data.append('x')
-                else:
-                    data.append(' ')
+            #posibles states: tablero, game_info, status, turn_color, en_passant
+            board = state["tablero"]
+            filas = ['8', '7', '6', '5', '4', '3', '2', '1']
+            columnas = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 
-            print(data)
+            for fila in filas:
+                #para que se vea 1 | P P P P etc
+                fila_visual = f"{fila} |" 
+                for col in columnas:
+                    clave = col + fila
+                    pieza = board.get(clave)
 
+                    if pieza is None:
+                        fila_visual += ". "
+                    else:
+                        if type(pieza).__name__ == "Knight":
+                            nombre = type(pieza).__name__[1]
+                        else:
+                            nombre = type(pieza).__name__[0] 
+                
+                        if pieza.color == "black":
+                            nombre = nombre.lower()
+                        else:
+                            nombre = nombre.upper()
+                        fila_visual += nombre + " "
+                print(fila_visual + f"| {fila}")
+                
+            print("  -----------------")
+            print("   a b c d e f g h\n")
 
+"""
 class PyGameRenderer(IRenderer):
     def __init__(self):
         self.screen = None
         self.array = []
         self.environment_statebuffer = {}
 
+    
     def observe(self, statebuffer):
         self.environment_statebuffer = statebuffer
-
+    
+    #cambiar
     def _prepare_data(self):
         data = []
         if self.state:
@@ -58,7 +71,8 @@ class PyGameRenderer(IRenderer):
             self.array = data
         else:
             self.array = None
-
+    
+    #cambiar
     def _pygame_render(self):
 
         pygame.init()
@@ -109,8 +123,10 @@ class PyGameRenderer(IRenderer):
                 sys.exit()
         time.sleep(0.05)
 
+    #esto queda igual
     def render(self):
         self.state = self.environment_statebuffer.get_state()
         if self.state:
             self._prepare_data()
             self._pygame_render()
+"""
