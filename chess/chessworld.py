@@ -14,13 +14,21 @@ La idea es que el jugador juega contra el agente.
 TO-DO list:
 - Implementar FREESTYLE CHESS
 - Implementar tiempo
+- Implementar función de evaluación (en principio, que cuente material, vea la actividad de las piezas)
+- Ahondar en lo de que puedan ser 2 agentes conectados a un sv
+- Algoritmos de búsqueda para los movs
+- Agregar el resto de actuadores (no importa que no se llamen en el código)
 """
 from statebuffer import IStateBuffer
 from environments import SimulatedEnvironment
 import random
+import copy
+
+white_color = "white"
+black_color = "black"
 
 class chessPiece:
-    #Defino esto para poder usar en la conversión de [x,y] a una posición (a1 por ejemplo)
+    #defino esto para poder usar en la conversión de [x,y] a una posición (a1 por ejemplo)
     letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
     
     numeros = ['1', '2', '3', '4', '5', '6', '7', '8']
@@ -49,6 +57,24 @@ class chessPiece:
         else:
             return False
 
+    def _sliding_moves(self, posInicio, tablero, direcciones):
+            moves = []
+            posActual = self.mapeoCoordenadas[posInicio]
+            fila = posActual[0]
+            col = posActual[1]
+
+            for dir_fila, dir_col in direcciones:
+                for i in range(1, 8):
+                    nueva_fila = fila + (dir_fila * i)
+                    nueva_col = col + (dir_col * i)
+                    
+                    if self.check_legal([nueva_col, nueva_fila], tablero):
+                        destino = self.letras[nueva_col] + self.numeros[nueva_fila]
+                        moves.append(destino)
+                    else:
+                        break
+                        
+            return moves
 
 class Pawn(chessPiece):
     def __init__(self, color):
@@ -62,7 +88,7 @@ class Pawn(chessPiece):
         col = posActual[1]
 
         #los peones blancos y negros tienen direcciones y filas de inicio distintas
-        if self.color == 'white':
+        if self.color == white_color:
             direccion = 1    # hacia indices mayores
             fila_inicio = 1  # fila 2
         else:
@@ -99,35 +125,17 @@ class Pawn(chessPiece):
                             moves.append(destino_diagonal)
         return moves
     
-
 class Queen(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
     def legal_moves(self, posInicio, tablero): 
-        moves = []
-
-        posActual = self.mapeoCoordenadas[posInicio]
-        fila = posActual[0]
-        col = posActual[1]
-
         direcciones = [
         (1, 0), (-1, 0), (0, 1), (0, -1), #direcciones de la torre
         (1, 1), (1, -1), (-1, 1), (-1, -1) #direcciones del alfil
         ]
 
-        for dir_fila, dir_col in direcciones:
-            for i in range(1, 8):
-                nueva_fila = fila + (dir_fila * i)
-                nueva_col = col + (dir_col * i)
-                if self.check_legal([nueva_col, nueva_fila], tablero):
-                    moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
-                    if tablero.get(self.letras[nueva_col] + self.numeros[nueva_fila]) is not None:
-                        break
-                else:
-                    break
-        return moves
-
+        return self._sliding_moves(posInicio, tablero, direcciones)
 
 class Rook(chessPiece):
     def __init__(self, color):
@@ -135,34 +143,13 @@ class Rook(chessPiece):
 
     #consigo los movimientos legales para una torre a partir de su posición en el tablero
     def legal_moves(self, posInicio, tablero):  
-        moves = []
-
-        posActual = self.mapeoCoordenadas[posInicio]
-        fila = posActual[0]
-        col = posActual[1]
-
         direcciones = [
             (1, 0),  # Arriba (aumenta fila)
             (-1, 0), # Abajo (disminuye fila)
             (0, 1),  # Derecha (aumenta columna)
             (0, -1)  # Izquierda (disminuye columna)
         ]
-
-        for dir_fila, dir_col in direcciones:
-            for i in range(1, 8):
-                nueva_fila = fila + (dir_fila * i)
-                nueva_col = col + (dir_col * i)
-                if self.check_legal([nueva_col, nueva_fila], tablero):
-                    moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
-                    #como check_legal devuelve true si el espacio está vacio o hay una pieza enemiga,
-                    #con esto me fijo si hay una pieza enemiga. En ese caso, detengo el movimiento en esa
-                    #dirección
-                    if tablero.get(self.letras[nueva_col] + self.numeros[nueva_fila]) is not None:
-                        break
-                else:
-                    break
-        return moves
-
+        return self._sliding_moves(posInicio, tablero, direcciones)
 
 class Knight(chessPiece):
     def __init__(self, color):
@@ -201,18 +188,11 @@ class Knight(chessPiece):
                     moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
         return moves
 
-
 class Bishop(chessPiece):
     def __init__(self, color):
         super().__init__(color)
 
     def legal_moves(self,posInicio, tablero):  
-        moves = []
-        
-        posActual = self.mapeoCoordenadas[posInicio]
-        fila = posActual[0]
-        col = posActual[1]
-
         direcciones = [
             #diagonal superior derecha
             (1, 1),
@@ -223,19 +203,7 @@ class Bishop(chessPiece):
             #diagonal inferior izquierda
             (-1, -1)
         ]
-
-        for dir_fila, dir_col in direcciones:
-            for i in range(1, 8):
-                nueva_fila = fila + (dir_fila * i)
-                nueva_col = col + (dir_col * i)
-                if self.check_legal([nueva_col, nueva_fila], tablero):
-                    moves.append(self.letras[nueva_col] + self.numeros[nueva_fila])
-                    if tablero.get(self.letras[nueva_col] + self.numeros[nueva_fila]) is not None:
-                        break
-                else:
-                    break
-        return moves
-
+        return self._sliding_moves(posInicio, tablero, direcciones)
 
 class King(chessPiece):
     def __init__(self, color):
@@ -284,7 +252,6 @@ class King(chessPiece):
 
         return moves
 
-
 class chessEnv(SimulatedEnvironment):
    
     #Este diccionario es simplemente para ayudar despues con los movimientos, lo pongo como una variable
@@ -301,9 +268,9 @@ class chessEnv(SimulatedEnvironment):
         super(chessEnv, self).add(agent_id)
         random_number = random.randint(1,2)
         if random_number == 1:
-            self._agents_colors[agent_id] = "white"
+            self._agents_colors[agent_id] = white_color
         else:
-            self._agents_colors[agent_id] = "black"
+            self._agents_colors[agent_id] = black_color
 
     def remove(self, agent_id: int) -> None:
         super(chessEnv, self).remove(agent_id)
@@ -321,60 +288,22 @@ class chessEnv(SimulatedEnvironment):
                 tablero[posicion] = None 
         return tablero
     
-    #Esta función va a poner las piezas (que van a ser clases) en el tablero principal
-    @staticmethod
-    def rellenarTablero(tablero):
-        tablero['a8'] = Rook('black')
-        tablero['h8'] = Rook('black')
-        tablero['b8'] = Knight('black')
-        tablero['g8'] = Knight('black')
-        tablero['c8'] = Bishop('black')
-        tablero['f8'] = Bishop('black')
-        tablero['d8'] = Queen('black')
-        tablero['e8'] = King('black')
-        tablero['a7'] = Pawn('black')
-        tablero['h7'] = Pawn('black')
-        tablero['b7'] = Pawn('black')
-        tablero['g7'] = Pawn('black')
-        tablero['c7'] = Pawn('black')
-        tablero['f7'] = Pawn('black')
-        tablero['d7'] = Pawn('black')
-        tablero['e7'] = Pawn('black')
-        
-        tablero['a2'] = Pawn('white')
-        tablero['h2'] = Pawn('white')
-        tablero['b2'] = Pawn('white')
-        tablero['g2'] = Pawn('white')
-        tablero['c2'] = Pawn('white')
-        tablero['f2'] = Pawn('white')
-        tablero['d2'] = Pawn('white')
-        tablero['e2'] = Pawn('white')
-        tablero['a1'] = Rook('white')
-        tablero['h1'] = Rook('white')
-        tablero['b1'] = Knight('white')
-        tablero['g1'] = Knight('white')
-        tablero['c1'] = Bishop('white')
-        tablero['f1'] = Bishop('white')
-        tablero['d1'] = Queen('white')
-        tablero['e1'] = King('white')
-        return tablero
-    
     def crearYRellenarTablero(self):
-        tablero = self.crearTablero()
-        self.rellenarTablero(tablero)
-        return tablero
+        self.FEN_board_loader("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+        return self._tablero
 
     def __init__(self):
         super(chessEnv, self).__init__()
-        self._tablero = self.crearYRellenarTablero()
-        self._tableroCoordenadas = chessEnv.mapeoCoordenadas
-        self._agents = []
-        self._agents_colors = {}
         self._game_info = {
             "move_counter" : 0,
             "fifty_move_clock": 0,
             "en_passant_target" : None,
         }
+        self._tablero = self.crearYRellenarTablero()
+        self._tableroCoordenadas = chessEnv.mapeoCoordenadas
+        self._agents = []
+        self._agents_colors = {}
+
 
     #falta parte de enroque
     def FEN_board_loader(self, fen_string):
@@ -406,9 +335,9 @@ class chessEnv(SimulatedEnvironment):
                     col += int(char)
                 else:
                     if char.isupper():
-                        color = "white"
+                        color = white_color
                     else: 
-                        color = "black"
+                        color = black_color
                     clase_pieza = piece_classes[char.lower()]
 
                     nueva_pieza = clase_pieza(color)
@@ -452,10 +381,10 @@ class chessEnv(SimulatedEnvironment):
                     king_pos = pos
                     break
         
-        if color_rey == "white":
-            enemy_color = "black" 
+        if color_rey == white_color:
+            enemy_color = black_color 
         else:
-            enemy_color = "white"
+            enemy_color = white_color
 
         for pos, pieza in tablero.items():
             if pieza is not None and pieza.color == enemy_color:
@@ -465,8 +394,8 @@ class chessEnv(SimulatedEnvironment):
      
     #esta funcion sirve para ver si un movimiento no va a poner al rey en jaque. Implementa 123 de la timeline
     @staticmethod
-    def safe_movement(origen, destino, color, tablero):
-        copia_tablero = tablero.copy()
+    def safe_movement(origen, destino, color, tablero) -> bool:
+        copia_tablero = copy.deepcopy(tablero)
 
         pieza = copia_tablero[origen]
         copia_tablero[destino] = pieza
@@ -492,7 +421,7 @@ class chessEnv(SimulatedEnvironment):
             if chessEnv.check_check(color, copia_tablero_dos):
                 return False
         return True
-        
+
     @staticmethod
     def has_movements(color,tablero, en_passant_target=None):
         for pos_origen, pieza in tablero.items():
@@ -527,7 +456,7 @@ class chessEnv(SimulatedEnvironment):
     #es medio el "arbitro" esta funcion
     def get_game_status(self):
         """
-        El juego solo tiene 4 estados posibles:
+        El juego solo tiene 5 estados posibles:
         - En progreso (in_progress)
         - Ganaron blancas (white_won)
         - Ganaron negras (black_won)
@@ -539,15 +468,15 @@ class chessEnv(SimulatedEnvironment):
             return "draw_by_50_moves"
         
         if self._game_info["move_counter"] % 2 == 0:
-            turn = "white"  
+            turn = white_color  
         else:
-            turn = "black" 
+            turn = black_color 
         
         ep_target = self._game_info["en_passant_target"]
 
         # Verificamos estados finales
         if chessEnv.check_mate(turn, self._tablero, ep_target):
-            if turn == "white":
+            if turn == white_color:
                 return "black_won"
             else:
                 return "white_won"            
@@ -556,7 +485,7 @@ class chessEnv(SimulatedEnvironment):
         else:
             return "in_progress"
     
-    def _handle_move(self, agent_id: int, origen, destino: str) -> None:
+    def _handle_move(self, agent_id: int, origen, destino: str, move_counter: str) -> None:
         #validamos que hayan entrado dos argumentos
         if not origen or not destino:
             print(f"Error: Invalid Movement {origen}->{destino}")
@@ -564,6 +493,16 @@ class chessEnv(SimulatedEnvironment):
         
         pieza = self._tablero.get(origen)
         agent_color = self._agents_colors.get(agent_id)
+        turn_color = white_color if self._game_info["move_counter"] % 2 == 0 else black_color
+
+        if agent_color != turn_color:
+            print("El agente intentó mover cuando no era su turno")
+            return 
+
+        if move_counter != self._game_info["move_counter"]:
+            print("El agente intentó mover pensando en un move_counter distinto")
+            return
+        
         flag_ep = False
 
         #validamos que haya una pieza que mover y que sea del mismo color que el agente
@@ -648,40 +587,50 @@ class chessEnv(SimulatedEnvironment):
             self._tablero[origen] = None
             pieza.has_moved = True
 
-    def get_property(self, agent_id: int, property_name: str) -> dict:
+    def get_property(self, agent_id: int, property_name: str) -> dict | None:
         if agent_id in self._agents:
             response = {"agent": agent_id}
-            #en caso de tener más métodos, ponerlos aca
+
             property_methods = {
                 "tablero": lambda x: self._tablero,                    
                 "color": self.color_check,                         
                 "game_state": lambda x: self.get_game_status(),        
                 "en_passant": lambda x: self._game_info["en_passant_target"],
+                "turn_color": lambda x: white_color if self._game_info["move_counter"] % 2 == 0 else black_color,
+                "move_counter": lambda x: self._game_info["move_counter"]
             }
 
             property_method = property_methods.get(property_name)
 
             if property_method:
                 response[property_name] = property_method(agent_id) #el (agent_id) es para ejecutar el self._tablero
+                return response
             else:
                 print(f"Invalid property: {property_name}")
 
-            return response
+            return None
     
     def take_action(self, agent_id: int, action_name: str, params: dict = {}) -> None:
-        if agent_id in self._agents:
-            action_methods = {
-                "move": (self._handle_move, ["origen", "destino"])
-            }
+        if agent_id not in self._agents:
+            return
+        
+        action_methods = {
+            "move": (self._handle_move, ["origen", "destino", "move_counter"])
+        }
 
-            action_method, expected_params = action_methods.get(action_name, (None, None))
-            if action_method:
-                args = [agent_id] + [params.get(param) for param in expected_params]
-                action_method(*args)
-                self._update_statebuffers()
-            else:
-                print(f"Invalid action: {action_name}")
+        action_info = action_methods.get(action_name)
+        if action_info is None:
+            print(f"Invalid action: {action_name}")
+            return
 
+        action_method, expected_params = action_info
+        args = [agent_id] + [params.get(param) for param in expected_params]
+        try:
+            action_method(agent_id, **params)
+            self._update_statebuffers()
+        except TypeError as e:
+            print(f"Params error in '{action_name}': {e}")
+            
     def add_statebuffer(self, agent_id: int, statebuffer: IStateBuffer) -> None:
         super(chessEnv, self).add_statebuffer(agent_id, statebuffer)
         self._update_statebuffers()
@@ -692,18 +641,18 @@ class chessEnv(SimulatedEnvironment):
     def _update_statebuffers(self):
         relevant_statebuffers = [entry["statebuffer"] for entry in self._statebuffers]        
         if self._game_info["move_counter"] % 2 == 0:
-            turn_color = "white"
+            turn_color = white_color
         else:
-            turn_color = "black"
+            turn_color = black_color
 
         for statebuffer in relevant_statebuffers:
             datos_juego = {
-                "tablero": self._tablero.copy(), 
-                "game_info": self._game_info.copy(),
+                "tablero": copy.deepcopy(self._tablero), 
+                "game_info": copy.deepcopy(self._game_info),
                 "status": self.get_game_status(),
                 "turn_color": turn_color,
-                #por las dudas lo paso explicito, no pasa nada con no hacerlo
                 "en_passant": self._game_info["en_passant_target"],
             }
             
             statebuffer.update(datos_juego)
+

@@ -3,7 +3,6 @@ from abc import ABCMeta, abstractmethod
 
 
 class SimulatedEnvironment(metaclass=ABCMeta):
-
     def __init__(self):
         self._agents = []
         self._statebuffers = []
